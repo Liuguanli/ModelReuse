@@ -2,6 +2,5 @@ pre-train/data/*
 pre-train/trained_models/*
 *.o
 Main
-entities/*.o
-/*/*.o
+# entities/*.o
 
