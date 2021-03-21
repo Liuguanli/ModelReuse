@@ -1,7 +1,7 @@
 pre-train/data/*
 pre-train/trained_models/*
 *.o
-Main
+Main.o
 # entities/*.o
 utils/*.o
 
