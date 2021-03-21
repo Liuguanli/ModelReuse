@@ -5,7 +5,7 @@ class Constants
 {
 public:
     static const bool IS_RECORD_BUILD_TIME = false;
-    static const bool MODEL_REUSE = false;
+    static const bool MODEL_REUSE = true;
     static const int WIDTH = 4;
     static const int BIN_NUM = 10;
     static const int EPOCH = 500;

@@ -46,7 +46,7 @@ struct Net : torch::nn::Module
 {
 public:
     
-    string PATH = "../pre-train/trained_models/nn/4/";
+    string PATH = "./pre-train/trained_models/nn/4/";
     // string PATH = "../../pre-train/trained_models/nn/4/";
 
     float *w1;
@@ -86,6 +86,7 @@ public:
     uint64_t x_gap;
     uint64_t start_y;
     uint64_t y_gap;
+    std::vector<uint64_t> records;
     // uint64_t cardinality;
     // uint64_t end_y;
 
@@ -515,7 +516,6 @@ public:
         double min_dist = 1.0;
         std::map<string, std::vector<double>>::iterator iter;
         iter = model_features.begin();
-
         while (iter != model_features.end())
         {
             double temp_dist = target_hist.cal_dist(iter->second);
@@ -525,6 +525,7 @@ public:
                 model_path = iter->first;
                 if (min_dist <= Constants::THRESHOLD)
                 {
+                    std::shared_ptr<Net> temp_net = models[model_path];
                     break;
                 }
             }
@@ -563,7 +564,7 @@ public:
 
     static void load_trained_lr_models(string ppath)
     {
-        std::cout<< "load begin" << std::endl;
+        // std::cout<< "load begin" << std::endl;
         auto load_start = std::chrono::high_resolution_clock::now();
         if(lr_model_features.size() > 0 and lr_model_features.size() > 0)
         {

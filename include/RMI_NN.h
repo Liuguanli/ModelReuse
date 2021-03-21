@@ -15,6 +15,7 @@
 #include "../entities/Histogram.h"
 #include "../utils/ModelTools.h"
 #include "../utils/Constants.h"
+#include "../utils/ExpRecorder.h"
 
 #include <torch/script.h>
 #include <ATen/ATen.h>
@@ -41,7 +42,7 @@ private:
     uint64_t N;
     std::set<string> reused_models;
     // string PATH = "./pre-train/trained_models/nn/4/" + to_string(Constants::THRESHOLD) + "/";
-    string PATH = "../pre-train/trained_models/nn/4/0.1/";
+    string PATH = "/home/research/code/SOSD/pre-train/trained_models/nn/4/0.1/";
     // string PATH = "../../pre-train/trained_models/nn/4/" + to_string(Constants::THRESHOLD) + "/";
 public:
     long time_cost_1 = 0;
@@ -57,9 +58,11 @@ public:
     // RMI_NN(int);
 
     // RMI_NN();
-    
+
     bool is_model_reuse = false;
     int width;
+
+    std::vector<uint64_t> records;
 
     std::vector<std::vector<std::shared_ptr<Net>>> index;
 
@@ -80,14 +83,16 @@ public:
     {
         this->is_model_reuse = is_model_reuse;
         this->tag = tag;
-        this->width = Constants::WIDTH;;
+        this->width = Constants::WIDTH;
+        ;
         this->branch = branch;
     }
 
     RMI_NN(string tag, int branch)
     {
         this->tag = tag;
-        this->width = Constants::WIDTH;;
+        this->width = Constants::WIDTH;
+        ;
         this->branch = branch;
     }
 
@@ -117,7 +122,7 @@ public:
 
     size_t get_size() const
     {
-        // layer1 weights + bias  layer2 weights + bias  
+        // layer1 weights + bias  layer2 weights + bias
         int layer1_weights_num = width;
         int layer1_bias_num = width;
         int layer2_weights_num = width;
@@ -133,7 +138,7 @@ public:
         if (is_model_reuse)
         {
             // std::cout << "size of reused models: " << reused_models.size() << std::endl;
-            return sizeof(double) * reused_models.size() + sizeof(double) * reused_models.size() * model_size+ sizeof(double) * error_num * layer2_model_num;
+            return sizeof(double) * reused_models.size() + sizeof(double) * reused_models.size() * model_size + sizeof(double) * error_num * layer2_model_num;
         }
         else
         {
@@ -141,7 +146,7 @@ public:
         }
     }
 
-    long long search_one_layer(uint64_t search_key, uint64_t& begin, uint64_t& end)
+    long long search_one_layer(uint64_t search_key, uint64_t &begin, uint64_t &end)
     {
         std::shared_ptr<Net> top = index[0][0];
         double search_key_double = double(search_key - top->start_x) / top->x_gap;
@@ -159,7 +164,78 @@ public:
         return pos;
     }
 
-    long long search(uint64_t search_key, uint64_t& begin, uint64_t& end)
+    long long search(ExpRecorder &exp_recorder, uint64_t search_key, uint64_t &begin, uint64_t &end)
+    {
+        auto start1 = std::chrono::high_resolution_clock::now();
+        std::shared_ptr<Net> top = index[0][0];
+        double search_key_double = double(search_key - top->start_x) / top->x_gap;
+        // std::cout << "search_key: " << search_key << std::endl;
+        // std::cout << "top->start_x: " << top->start_x << std::endl;
+        // std::cout << "top->x_gap: " << top->x_gap << std::endl;
+        // std::cout << "search_key_double: " << search_key_double << std::endl;
+        auto finish1 = std::chrono::high_resolution_clock::now();
+        exp_recorder.vector_visit_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
+        // std::cout<< "search : normalize 1------1------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count() << std::endl;
+        // time_cost_1 += std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
+        auto start2 = std::chrono::high_resolution_clock::now();
+        long long pos = top->predict_Double(search_key_double) * branch;
+        // std::cout << "pos: " << pos << std::endl;
+        auto finish2 = std::chrono::high_resolution_clock::now();
+        exp_recorder.prediction_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
+        // std::cout<< "search prediction 1------2------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count() << std::endl;
+        // time_cost_2 += std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
+        if (pos < 0)
+        {
+            pos = 0;
+        }
+        else if (pos >= branch)
+        {
+            pos = branch - 1;
+        }
+        auto start31 = std::chrono::high_resolution_clock::now();
+        // std::shared_ptr<Net> net = index[1][pos];
+        std::shared_ptr<Net> net = layer2_index[pos];
+        auto finish31 = std::chrono::high_resolution_clock::now();
+        // std::cout<< "get model in layer2------31------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish31 - start31).count() << std::endl;
+        exp_recorder.vector_visit_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish31 - start31).count();
+        // std::cout<< "pos: " << pos << std::endl;
+        // std::cout<< "net->start_y: " << net->start_y << std::endl;
+        // std::cout<< "search_key: " << search_key << std::endl;
+        // auto start32 = std::chrono::high_resolution_clock::now();
+        search_key_double = double(search_key - net->start_x) / net->x_gap;
+        // auto finish32 = std::chrono::high_resolution_clock::now();
+        // std::cout<< "search : normalize 2------32------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish32 - start32).count() << std::endl;
+        // time_cost_32 += std::chrono::duration_cast<std::chrono::nanoseconds>(finish32 - start32).count();
+        auto start4 = std::chrono::high_resolution_clock::now();
+        pos = net->predict_Double(search_key_double) * net->y_gap;
+        auto finish4 = std::chrono::high_resolution_clock::now();
+        // std::cout<< "search prediction 2------4------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish4 - start4).count() << std::endl;
+        exp_recorder.prediction_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish4 - start4).count();
+        // auto start5 = std::chrono::high_resolution_clock::now();
+        if (pos < 0)
+        {
+            pos = 0;
+        }
+        if (pos >= net->y_gap)
+        {
+            pos = net->y_gap - 1;
+        }
+        // std::cout << "pos: " << pos << std::endl;
+        begin = pos > net->min_error ? pos - net->min_error + net->start_y : net->start_y;
+        end = (pos + net->max_error + net->start_y) >= N ? N - 1 : (pos + net->start_y + net->max_error);
+
+        auto finish5 = std::chrono::high_resolution_clock::now();
+        // std::cout<< "return------5------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish5 - start5).count() << std::endl;
+        // time_cost_5 += std::chrono::duration_cast<std::chrono::nanoseconds>(finish5 - start5).count();
+        // auto end = chrono::high_resolution_clock::now();
+        // cout<< "predict time: " << chrono::duration_cast<chrono::nanoseconds>(end - start).count() << endl;
+        // std::cout<< "net->start_y: " << net->start_y << std::endl;
+        // std::cout<< "net->y_gap: " << net->y_gap << std::endl;
+        exp_recorder.time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish5 - start1).count();
+        return pos + net->start_y;
+    }
+
+    long long search(uint64_t search_key, uint64_t &begin, uint64_t &end)
     {
         // auto start1 = std::chrono::high_resolution_clock::now();
         std::shared_ptr<Net> top = index[0][0];
@@ -181,7 +257,7 @@ public:
         {
             pos = 0;
         }
-        else if(pos >= branch)
+        else if (pos >= branch)
         {
             pos = branch - 1;
         }
@@ -227,10 +303,11 @@ public:
         return pos + net->start_y;
     }
 
-    void build_one_layer(std::vector<uint64_t> data)
+    void build_one_layer(ExpRecorder &exp_recorder, std::vector<uint64_t> data)
     {
+        auto start = std::chrono::high_resolution_clock::now();
         N = data.size();
-
+        records = data;
         uint64_t start_x = data[0];
         uint64_t end_x = data[N - 1];
         uint64_t key_gap = end_x - start_x;
@@ -242,7 +319,7 @@ public:
             // Histogram histogram(data.begin(), data.size());
             string model_path;
             double distance;
-            if(net->is_model_reusable(histogram, 1.0, model_path, distance))
+            if (net->is_model_reusable(histogram, 1.0, model_path, distance))
             {
                 // std::cout<< "model_path: " << model_path << std::endl;
                 torch::load(net, (PATH + model_path + ".pt"));
@@ -274,10 +351,13 @@ public:
 
         layer1_index.push_back(net);
         index.push_back(layer1_index);
+        auto end = std::chrono::high_resolution_clock::now();
+        exp_recorder.build_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
 
-    void build_two_layer(std::vector<uint64_t> data)
+    void build_two_layer(ExpRecorder &exp_recorder, std::vector<uint64_t> data)
     {
+        auto start = std::chrono::high_resolution_clock::now();
         N = data.size();
         uint64_t start_x = data[0];
         uint64_t end_x = data[N - 1];
@@ -290,7 +370,7 @@ public:
             Histogram histogram(data);
             // Histogram histogram(data.begin(), data.size());
             string model_path;
-            if(net->is_model_reusable(histogram, 1.0, model_path, distance))
+            if (net->is_model_reusable(histogram, 1.0, model_path, distance))
             {
                 // reused_models.insert(model_path);
                 // torch::load(net, (PATH + model_path + ".pt"));
@@ -300,8 +380,13 @@ public:
                 // net->start_y = 0;
                 // net->y_gap = N;
                 // net->getParameters_Double();
-                torch::load(net, (PATH + model_path + ".pt"));
-                net->getParameters_Double();
+                // torch::load(net, (PATH + model_path + ".pt"));
+                // net->getParameters_Double();
+                std::shared_ptr<Net> temp_net = net->models[model_path];
+                net->w1_D = temp_net->w1_D;
+                net->w2_D = temp_net->w2_D;
+                net->b1_D = temp_net->b1_D;
+                net->b2_D = temp_net->b2_D;
             }
             // net->reuse_model(net, data);
         }
@@ -364,21 +449,25 @@ public:
             size_sum += stage2[i].size();
         }
 
-        for(int j = 0; j < branch; j++)
+        uint64_t sub_start_x;
+        uint64_t sub_key_gap;
+        uint64_t start_ys_y;
+        for (int j = 0; j < branch; j++)
         {
             // std::cout<< "size: " <<j << "th " << stage2[j].size() << std::endl;
             uint64_t sub_data_size = stage2[j].size();
             if (sub_data_size == 0)
             {
-                auto net = std::make_shared<Net>(0, 1, 0, 1);
+                auto net = std::make_shared<Net>(sub_start_x, sub_key_gap, start_ys_y, 1);
+                net->getParameters_Double();
                 layer2_index.push_back(net);
+                net->insert_number_bound = 0;
                 continue;
             }
-            
-            uint64_t sub_start_x = stage2[j][0];
-            uint64_t sub_key_gap = stage2[j][sub_data_size - 1] - sub_start_x;
-
-            auto net = std::make_shared<Net>(sub_start_x, sub_key_gap, start_ys[j], sub_data_size);
+            sub_start_x = stage2[j][0];
+            sub_key_gap = stage2[j][sub_data_size - 1] - sub_start_x;
+            start_ys_y = start_ys[j];
+            auto net = std::make_shared<Net>(sub_start_x, sub_key_gap, start_ys_y, sub_data_size);
 
             // && sub_data_size >= Constants::BIN_NUM
             if (is_model_reuse)
@@ -386,7 +475,7 @@ public:
                 Histogram histogram(stage2[j]);
                 // Histogram histogram(stage2[j].begin(), stage2[j].size());
                 string model_path;
-                if(net->is_model_reusable(histogram, 1.0, model_path, distance))
+                if (net->is_model_reusable(histogram, 1.0, model_path, distance))
                 {
                     reused_models.insert(model_path);
                     torch::load(net, (PATH + model_path + ".pt"));
@@ -419,19 +508,21 @@ public:
             net->insert_number_bound = gap * sub_data_size / (1 - gap);
             net->cal_errors(stage2[j]);
             layer2_index.push_back(net);
+            net->records = stage2[j];
             // break;
         }
         index.push_back(layer2_index);
+        auto end = std::chrono::high_resolution_clock::now();
+        exp_recorder.build_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     }
 
     void insert_one_layer(uint64_t insert_data)
     {
-        
     }
 
     void insert_two_layer(uint64_t insert_data, std::vector<uint64_t>::iterator begin, uint64_t inserted_num)
     {
-        // TODO prediction 
+        // TODO prediction
         std::shared_ptr<Net> top = index[0][0];
         double search_key_double = double(insert_data - top->start_x) / top->x_gap;
 
@@ -441,8 +532,8 @@ public:
         if (pos < 0)
         {
             pos = 0;
-        } 
-        else if(pos >= branch)
+        }
+        else if (pos >= branch)
         {
             pos = branch - 1;
         }
@@ -450,14 +541,15 @@ public:
         net->insert_number++;
         // std::cout << "net->insert_number: " << net->insert_number << std::endl;
         // std::cout << "net->insert_number_bound: " << net->insert_number_bound << std::endl;
-        if (net->insert_number >= net->insert_number_bound)
+        if (net->insert_number > net->insert_number_bound)
         {
             // TODO rebuild!!!
             // auto start3 = std::chrono::high_resolution_clock::now();
+            stage2[pos].push_back(insert_data);
             layer2_index[pos] = update_rebuild(stage2[pos], net->start_y);
             // auto end3 = std::chrono::high_resolution_clock::now();
             // std::cout<< "rebuild time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count() << std::endl;
-        } 
+        }
         else
         {
             // std::cout << "-------1------" <<std::endl;
@@ -468,6 +560,14 @@ public:
             uint64_t end = net->start_y + net->y_gap + inserted_num;
             uint64_t mid = (start + end) / 2;
 
+            // if (inserted_num > 196188009)
+            // {
+            //     std::cout << "inserted_num: ? " << inserted_num << std::endl;
+            //     std::cout << "start: " << start <<std::endl;
+            //     std::cout << "end: " << end <<std::endl;
+            //     std::cout << "net->start_x: " << net->start_x <<std::endl;
+            //     std::cout << "*(begin + net->start_y) : " << *(begin + net->start_y)  <<std::endl;
+            // }
             // std::cout << "start: " << start <<std::endl;
             // std::cout << "end: " << end <<std::endl;
             // std::cout << "net->start_x: " << net->start_x <<std::endl;
@@ -476,15 +576,15 @@ public:
             if (*(begin + net->start_y) != net->start_x)
             {
                 uint64_t temp = *(begin + mid);
-                while(temp != net->start_x) 
+                while (temp != net->start_x && start <= end)
                 {
-                    if (temp < net->start_x) 
+                    if (temp < net->start_x)
                     {
-                        start = mid;
-                    } 
+                        start = mid + 1;
+                    }
                     else if (temp > net->start_x)
                     {
-                        end = mid;
+                        end = mid - 1;
                     }
                     else
                     {
@@ -495,23 +595,23 @@ public:
                 }
                 // net->start_y = mid;
             }
-            // std::cout << "-------2------" <<std::endl;
             //TODO insert
-            
+
             start = net->start_y;
             end = net->start_y + net->y_gap;
             mid = (start + end) / 2;
             // std::cout<< "start: " << *(begin + start) << " end: " << *(begin + end) << " insert_data: " << insert_data << std::endl;
-            while(start < end) {
+            while (start < end)
+            {
                 // std::cout<< "start: " << start << " end: " << end << " mid: " << mid << std::endl;
-                if (*(begin + mid) <= insert_data) 
+                if (*(begin + mid) <= insert_data)
                 {
-                    if (*(begin + mid + 1) >= insert_data) 
+                    if (*(begin + mid + 1) >= insert_data)
                     {
                         break;
                     }
                     start = mid + 1;
-                } 
+                }
                 else if (*(begin + mid) > insert_data)
                 {
                     if (*(begin + mid - 1) <= insert_data)
@@ -529,24 +629,49 @@ public:
     std::shared_ptr<Net> update_rebuild(std::vector<uint64_t> data, uint64_t start_y)
     {
         // std::cout << "update_rebuild: 1" << std::endl;
+        // auto start = std::chrono::high_resolution_clock::now();
         uint64_t cardinality = data.size();
         uint64_t start_x = data[0];
         uint64_t key_gap = data[cardinality - 1] - start_x;
+        key_gap = key_gap == 0 ? 1 : key_gap;
         auto net = std::make_shared<Net>(start_x, key_gap, start_y, cardinality);
+        // auto finish = std::chrono::high_resolution_clock::now();
+        // std::cout << "rebuild creation time1: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count() << std::endl;
+        // start = std::chrono::high_resolution_clock::now();
         Histogram histogram(data);
+        // finish = std::chrono::high_resolution_clock::now();
+        // std::cout << "rebuild histogram time2: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count() << std::endl;
         string model_path;
         double distance;
         // std::cout << "update_rebuild: 2" << std::endl;
+        // start = std::chrono::high_resolution_clock::now();
         net->is_model_reusable(histogram, 1.0, model_path, distance);
+        // finish = std::chrono::high_resolution_clock::now();
+        // std::cout << "rebuild reuse time3: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count() << std::endl;
+        // start = std::chrono::high_resolution_clock::now();
+        // torch::load(net, (PATH + model_path + ".pt"));
+        // net->getParameters_Double();
+        // TODO only use the parameter from models!!!
         // net = net->models[model_path];
-        // net->start_x = start_x;
-        // net->x_gap = key_gap;
-        // net->start_y = start_y;
-        // net->y_gap = cardinality;
+        // double *w1_D;
+        // double *w2_D;
+        // double *b1_D;
+        // double b2_D = 0.0;
 
-        torch::load(net, (PATH + model_path + ".pt"));
-        // std::cout << "update_rebuild: 3" << std::endl;
-        net->getParameters_Double();
+        std::shared_ptr<Net> temp_net = net->models[model_path];
+
+        net->w1_D = temp_net->w1_D;
+        net->w2_D = temp_net->w2_D;
+        net->b1_D = temp_net->b1_D;
+        net->b2_D = temp_net->b2_D;
+
+        net->start_x = start_x;
+        net->x_gap = key_gap;
+        net->start_y = start_y;
+        net->y_gap = cardinality;
+        net->records = data;
+        // std::cout << "size 1: " << data.size() << std::endl;
+        // std::cout << "size 2: " << net->models[model_path]->records.size() << std::endl;
         net->insert_number = 0;
         double gap = Constants::THRESHOLD - distance;
         gap = gap > 0 ? gap : 0.1;
@@ -554,9 +679,190 @@ public:
         net->min_error = cardinality * distance + (-net->model_infos[model_path].min_err * 100000) * 100000 / cardinality;
         net->max_error = cardinality * distance + (net->model_infos[model_path].max_err * 100000) * 100000 / cardinality;
         // std::cout << "update_rebuild: 4" << std::endl;
+        // auto finish = std::chrono::high_resolution_clock::now();
+        // std::cout << "rebuild time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count() << std::endl;
+        // std::cout << "insert_number_bound: " << net->insert_number_bound << " min_error: " << net->min_error << " max_error: " << net->max_error << std::endl;
         return net;
     }
 
+    void print_num()
+    {
+        uint64_t total_num = 0;
+        for (size_t i = 0; i < layer2_index.size(); i++)
+        {
+            // std::shared_ptr<Net> net = layer2_index[i];
+            total_num += layer2_index[i]->records.size();
+        }
+        std::cout << "total_num: " << total_num << std::endl;
+    }
+
+    void insert_two_layer_2(ExpRecorder &exp_recorder, uint64_t insert_data, uint64_t inserted_num)
+    {
+        // auto start1 = std::chrono::high_resolution_clock::now();
+        std::shared_ptr<Net> top = index[0][0];
+        double search_key_double = double(insert_data - top->start_x) / top->x_gap;
+        long long pos = top->predict_Double(search_key_double) * branch;
+        if (pos < 0)
+        {
+            pos = 0;
+        }
+        else if (pos >= branch)
+        {
+            pos = branch - 1;
+        }
+        std::shared_ptr<Net> net = layer2_index[pos];
+        net->insert_number++;
+        // auto end1 = std::chrono::high_resolution_clock::now();
+        // exp_recorder.prediction_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - start1).count();
+        // auto start4 = std::chrono::high_resolution_clock::now();
+        uint64_t inserted_pos = 0;
+        if (net->records[0] > insert_data)
+        {
+            // auto start3 = std::chrono::high_resolution_clock::now();
+            net->records.insert(net->records.begin(), insert_data);
+            // auto end3 = std::chrono::high_resolution_clock::now();
+            // exp_recorder.insert_time_inner += std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count();
+        }
+        else if (net->records[net->records.size() - 1] < insert_data)
+        {
+            // auto start3 = std::chrono::high_resolution_clock::now();
+            net->records.push_back(insert_data);
+            inserted_pos = net->records.size();
+            // auto end3 = std::chrono::high_resolution_clock::now();
+            // exp_recorder.insert_time_inner += std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count();
+        }
+        else
+        {
+            long start = 0;
+            long finish = net->records.size() - 1;
+            long mid = 0;
+            // std::vector<uint64_t> temp_points = net->records;
+            while (start <= finish)
+            {
+                mid = (start + finish) / 2;
+                uint64_t temp_0 = net->records[mid];
+                uint64_t temp_1 = net->records[mid + 1];
+                if (temp_0 > insert_data)
+                {
+                    finish = mid - 1;
+                }
+                else if (temp_1 < insert_data)
+                {
+                    start = mid + 1;
+                }
+                else
+                {
+                    // auto start3 = std::chrono::high_resolution_clock::now();
+                    net->records.insert(net->records.begin() + mid + 1, insert_data);
+                    // net->records.emplace(net->records.begin() + mid + 1, insert_data);
+                    // auto end3 = std::chrono::high_resolution_clock::now();
+                    // exp_recorder.insert_time_inner += std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count();
+                    inserted_pos = mid + 1;
+                    break;
+                }
+            }
+
+            // std::cout<< "insert time 3 : " << std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count() << std::endl;
+        }
+        // auto end4 = std::chrono::high_resolution_clock::now();
+        // exp_recorder.insert_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end4 - start4).count();
+
+        // std::cout<< "insert time 4 : " << std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - start2).count() << std::endl;
+        // if((pos_l2 > inserted_pos && pos_l2 - inserted_pos <= net->min_error + net->insert_number_bound)
+        // || (pos_l2 < inserted_pos && inserted_pos - pos_l2 <= net->max_error + net->insert_number_bound))
+        // {
+        //     return;
+        // }
+        // else
+        // {
+        //     layer2_index[pos] = update_rebuild_2(stage2[pos], net->start_y);
+        // }
+        // }
+        if (net->insert_number > net->insert_number_bound)
+        {
+            auto start2 = std::chrono::high_resolution_clock::now();
+            // net->records.push_back(insert_data);
+            exp_recorder.rebuild_num++;
+            layer2_index[pos] = update_rebuild(net->records, net->start_y);
+            auto end2 = std::chrono::high_resolution_clock::now();
+            exp_recorder.rebuild_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - start2).count();
+            // std::cout<< "rebuild time------------: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - start2).count() << std::endl;
+        }
+    }
+
+    bool search_after_insertion(ExpRecorder &exp_recorder, uint64_t search_key)
+    {
+        auto start1 = std::chrono::high_resolution_clock::now();
+        std::shared_ptr<Net> top = index[0][0];
+        double search_key_double = double(search_key - top->start_x) / top->x_gap;
+        auto finish1 = std::chrono::high_resolution_clock::now();
+        exp_recorder.vector_visit_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish1 - start1).count();
+        auto start2 = std::chrono::high_resolution_clock::now();
+        long long pos = top->predict_Double(search_key_double) * branch;
+        auto finish2 = std::chrono::high_resolution_clock::now();
+        exp_recorder.prediction_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish2 - start2).count();
+        if (pos < 0)
+        {
+            pos = 0;
+        }
+        else if (pos >= branch)
+        {
+            pos = branch - 1;
+        }
+        auto start31 = std::chrono::high_resolution_clock::now();
+        std::shared_ptr<Net> net = layer2_index[pos];
+
+        auto finish31 = std::chrono::high_resolution_clock::now();
+        exp_recorder.vector_visit_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish31 - start31).count();
+
+        search_key_double = double(search_key - net->start_x) / net->x_gap;
+        auto start4 = std::chrono::high_resolution_clock::now();
+        pos = net->predict_Double(search_key_double) * net->y_gap;
+        auto finish4 = std::chrono::high_resolution_clock::now();
+        exp_recorder.prediction_time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish4 - start4).count();
+        auto start5 = std::chrono::high_resolution_clock::now();
+
+        if (pos < 0)
+        {
+            pos = 0;
+        }
+        if (pos >= net->y_gap)
+        {
+            pos = net->y_gap - 1;
+        }
+        // std::cout << "pos: " << pos << std::endl;
+        // uint64_t begin = pos > net->min_error ? pos - net->min_error + net->start_y : net->start_y;
+        // uint64_t end = (pos + net->max_error + net->start_y) >= N ? N - 1 : (pos + net->start_y + net->max_error);
+
+        long start = 0;
+        long finish = net->records.size() - 1;
+        long mid = 0;
+        std::vector<uint64_t> temp_points = net->records;
+
+        while (start <= finish)
+        {
+            mid = (start + finish) / 2;
+            uint64_t temp = temp_points[mid];
+            if (temp == search_key)
+            {
+                auto finish5 = std::chrono::high_resolution_clock::now();
+                exp_recorder.time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish5 - start5).count();
+
+                return true;
+            }
+            else if (temp < search_key)
+            {
+                start = mid + 1;
+            }
+            else
+            {
+                finish = mid - 1;
+            }
+        }
+        auto finish5 = std::chrono::high_resolution_clock::now();
+        exp_recorder.time += std::chrono::duration_cast<std::chrono::nanoseconds>(finish5 - start5).count();
+        return false;
+    }
 };
 
 #endif

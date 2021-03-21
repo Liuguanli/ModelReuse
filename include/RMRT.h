@@ -32,13 +32,12 @@
 class RMRT
 {
 private:
-
 public:
     uint64_t page_size;
     uint64_t real_page_size;
     // string PATH = "./pre-train/trained_models/nn/4/";
-    string PATH = "../pre-train/trained_models/nn/4/";
-    
+    string PATH = "../../pre-train/trained_models/nn/4/";
+
     string tag;
 
     uint64_t N;
@@ -56,7 +55,7 @@ public:
 
     uint64_t start_y;
 
-    uint64_t start_x;    
+    uint64_t start_x;
     uint64_t key_gap;
 
     bool is_leaf = false;
@@ -66,7 +65,7 @@ public:
 
     // uint64_t insert_number_bound;
     // uint64_t insert_number;
-    
+
     // bool build_recursively(std::vector<uint64_t>, string, uint64_t);
 
     // RMRT(int, uint64_t, string, uint64_t);
@@ -76,7 +75,8 @@ public:
     // uint64_t get_size();
 
     RMRT()
-    {}
+    {
+    }
 
     RMRT(int page_size, uint64_t threshold, string tag, uint64_t start_y)
     {
@@ -97,13 +97,13 @@ public:
         {
             int error_num = 2;
             int edge_value = 2;
-            return sizeof(double) * (layer1_weights_num + layer1_bias_num + layer2_weights_num + layer2_bias_num) + sizeof(double) * (error_num + edge_value); 
+            return sizeof(double) * (layer1_weights_num + layer1_bias_num + layer2_weights_num + layer2_bias_num) + sizeof(double) * (error_num + edge_value);
         }
         else
         {
             uint64_t result = sizeof(double) * (layer1_weights_num + layer1_bias_num + layer2_weights_num + layer2_bias_num);
             // std::cout << "children.size(): " << children.size() << std::endl;
-            for(RMRT rmrt : children)
+            for (RMRT rmrt : children)
             {
                 // std::cout << "rmrt.get_size(): " << rmrt.get_size() << std::endl;
                 result += rmrt.get_size();
@@ -112,7 +112,7 @@ public:
         }
     }
 
-    uint64_t search(uint64_t key, uint64_t& start, uint64_t& end)
+    uint64_t search(uint64_t key, uint64_t &start, uint64_t &end)
     {
         // double search_key = double;
         // std::cout<< "key: " << key << std::endl;
@@ -127,7 +127,7 @@ public:
         double res = net->predict_Double((key - start_x) * 1.0 / key_gap);
         if (is_leaf)
         {
-            long long pos = (long long) (res * cardinality);
+            long long pos = (long long)(res * cardinality);
             if (pos < 0)
             {
                 pos = 0;
@@ -142,7 +142,7 @@ public:
         }
         else
         {
-            int pos = (int) (res * real_page_size);
+            int pos = (int)(res * real_page_size);
             if (pos < 0)
             {
                 pos = 0;
@@ -161,12 +161,12 @@ public:
         // std::cout<<"build_recursively:" <<cardinality<< std::endl;
         start_x = data[0];
         key_gap = data[cardinality - 1] - start_x;
-
+        key_gap = key_gap == 0 ? 1 : key_gap;
         net = std::make_shared<Net>(start_x, key_gap, start_y, cardinality);
         string model_name = prefix + to_string(index);
 
-        string path = "./torch_models/" + tag + "/RMRT/" + to_string(page_size) + "_"+ to_string(threshold) + "/" + model_name + ".pt";
-    
+        string path = "./torch_models/" + tag + "/RMRT/" + to_string(page_size) + "_" + to_string(threshold) + "/" + model_name + ".pt";
+
         std::ifstream fin(path);
         // force enable model reuse
         // if (true)
@@ -174,7 +174,7 @@ public:
         Histogram histogram(data);
         string model_path;
         double distance;
-        if(net->is_model_reusable(histogram, 1.0, model_path, distance))
+        if (net->is_model_reusable(histogram, 1.0, model_path, distance))
         {
             // net = net->models[model_path];
             // net->start_x = start_x;
@@ -203,7 +203,6 @@ public:
                 net->y_gap = cardinality;
                 // torch::load(net, (PATH + model_path + ".pt"));
             }
-            
             net->getParameters_Double();
             // std::cout<< "distance: " << distance << std::endl;
         }
@@ -213,7 +212,7 @@ public:
             torch::save(net, path);
         }
 
-        if(cardinality < threshold) 
+        if (cardinality < threshold)
         {
             records = data;
             is_leaf = true;
@@ -224,7 +223,7 @@ public:
             for (long long i = 0; i < cardinality; i++)
             {
                 double res = net->predict_Double((data[i] - start_x) * 1.0 / key_gap);
-                long long pos = (long long) (res * cardinality);
+                long long pos = (long long)(res * cardinality);
                 if (pos < 0)
                 {
                     pos = 0;
@@ -268,7 +267,7 @@ public:
             for (uint64_t i = 0; i < cardinality; i++)
             {
                 double res = net->predict_Double((data[i] - start_x) * 1.0 / key_gap);
-                uint64_t pos = (long long) (res * real_page_size);
+                uint64_t pos = (long long)(res * real_page_size);
                 if (pos < 0)
                 {
                     pos = 0;
@@ -294,8 +293,8 @@ public:
                 RMRT rmrt(page_size, threshold, tag, start_y + start_ys[k]);
                 if (children_entities[k].size() == cardinality)
                 {
-                    std::cout<< "return false" << std::endl;
-                    string path = "./torch_models/" + tag + "/RMRT/" + to_string(page_size) + "_"+ to_string(threshold) + "/" + model_name + ".pt";
+                    std::cout << "return false" << std::endl;
+                    string path = "./torch_models/" + tag + "/RMRT/" + to_string(page_size) + "_" + to_string(threshold) + "/" + model_name + ".pt";
                     char path_char[path.size() + 1];
                     strcpy(path_char, path.c_str());
                     remove(path_char);
@@ -303,6 +302,7 @@ public:
                 }
                 if (children_entities[k].size() == 0)
                 {
+                    rmrt.is_leaf = true;
                     children.push_back(rmrt);
                     // children.push_back(NULL);
                     continue;
@@ -312,8 +312,8 @@ public:
                 // {
                 //     is_force = true;
                 // }
-                
-                if(rmrt.build_recursively(children_entities[k], model_name + "_", k))
+
+                if (rmrt.build_recursively(children_entities[k], model_name + "_", k))
                 {
                     children.push_back(rmrt);
                 }
@@ -337,7 +337,7 @@ public:
     //     string model_name = prefix + to_string(index);
 
     //     string path = "./torch_models/" + tag + "/RMRT/" + to_string(page_size) + "_"+ to_string(threshold) + "/" + model_name + ".pt";
-    
+
     //     std::ifstream fin(path);
     //     // force enable model reuse
     //     // if (true)
@@ -365,7 +365,7 @@ public:
     //     //     torch::save(net, path);
     //     // }
 
-    //     if(cardinality < threshold) 
+    //     if(cardinality < threshold)
     //     {
     //         is_leaf = true;
     //         insert_number_bound = (distance - Constants::THRESHOLD) * cardinality / (1 + Constants::THRESHOLD - distance);
@@ -462,7 +462,7 @@ public:
     //             // {
     //             //     is_force = true;
     //             // }
-                
+
     //             if(rmrt.build_recursively(children_entities[k].begin(), children_entities[k].size(), model_name + "_", k))
     //             {
     //                 children.push_back(rmrt);
@@ -481,6 +481,7 @@ public:
         cardinality = data.size();
         start_x = data[0];
         key_gap = data[cardinality - 1] - start_x;
+        key_gap = key_gap == 0 ? 1 : key_gap;
         net = std::make_shared<Net>(start_x, key_gap, start_y, cardinality);
         Histogram histogram(data);
         string model_path;
@@ -508,10 +509,18 @@ public:
         // std::cout<< "insert_number_bound: " << insert_number_bound << std::endl;
     }
 
+    // step 1 find prediction position
+    // step 2
     void insert(uint64_t insert_data, std::vector<uint64_t>::iterator begin, uint64_t inserted_num)
     {
-
         // auto start1 = std::chrono::high_resolution_clock::now();
+        if (is_leaf && records.size() == 0)
+        {
+            records.push_back(insert_data);
+            update_rebuild(records);
+            return;
+        }
+
         double res = net->predict_Double((insert_data - start_x) * 1.0 / key_gap);
         // auto end1 = std::chrono::high_resolution_clock::now();
         // std::cout<< "time1: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - start1).count() << std::endl;
@@ -522,15 +531,23 @@ public:
             uint64_t start = start_y;
             uint64_t end = start_y + cardinality + inserted_num;
             uint64_t mid = (start + end) / 2;
+
+            // if (inserted_num == 196188009)
+            // {
+            //     std::cout << "start: " << start << std::endl;
+            //     std::cout << "end: " << end << std::endl;
+            //     std::cout << "mid: " << mid << std::endl;
+            // }
+
             if (*(begin + start_y) != start_x && start <= end)
             {
                 uint64_t temp = *(begin + mid);
-                while(temp != start_x) 
+                while (temp != start_x && start <= end)
                 {
-                    if (temp < start_x) 
+                    if (temp < start_x)
                     {
                         start = mid + 1;
-                    } 
+                    }
                     else if (temp > start_x)
                     {
                         end = mid - 1;
@@ -549,21 +566,22 @@ public:
             // auto start3 = std::chrono::high_resolution_clock::now();
             //TODO insert
             net->insert_number++;
-            uint64_t pos = (uint64_t) (res * cardinality);
+            uint64_t pos = (uint64_t)(res * cardinality);
             start = start_y;
             end = start_y + cardinality;
             mid = (start + end) / 2;
             // std::cout<< "start: " << *(begin + start) << " end: " << *(begin + end) << " insert_data: " << insert_data << std::endl;
-            while(start < end) {
+            while (start < end)
+            {
                 // std::cout<< "start: " << start << " end: " << end << " mid: " << mid << std::endl;
-                if (*(begin + mid) <= insert_data) 
+                if (*(begin + mid) <= insert_data)
                 {
-                    if (*(begin + mid + 1) >= insert_data) 
+                    if (*(begin + mid + 1) >= insert_data)
                     {
                         break;
                     }
                     start = mid + 1;
-                } 
+                }
                 else if (*(begin + mid) > insert_data)
                 {
                     if (*(begin + mid - 1) <= insert_data)
@@ -584,6 +602,7 @@ public:
                 // TODO rebuild!!!
                 // std::cout<<"rebuild!!!" << std::endl;
                 // auto start4 = std::chrono::high_resolution_clock::now();
+                // std::cout<< "inserted_num: " << inserted_num << std::endl;
                 update_rebuild(records);
                 // build_recursively(records, "", 0);
                 // auto end4 = std::chrono::high_resolution_clock::now();
@@ -592,7 +611,7 @@ public:
         }
         else
         {
-            int pos = (int) (res * real_page_size);
+            int pos = (int)(res * real_page_size);
             if (pos < 0)
             {
                 pos = 0;
@@ -604,8 +623,6 @@ public:
             children[pos].insert(insert_data, begin, inserted_num);
         }
     }
-    
 };
-
 
 #endif
