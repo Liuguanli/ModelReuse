@@ -41,7 +41,7 @@ private:
     uint64_t N;
     std::set<string> reused_models;
     // string PATH = "./pre-train/trained_models/nn/4/" + to_string(Constants::THRESHOLD) + "/";
-    string PATH = "/home/research/code/SOSD/pre-train/trained_models/nn/4/0.1/";
+    string PATH = "../pre-train/trained_models/nn/4/0.1/";
     // string PATH = "../../pre-train/trained_models/nn/4/" + to_string(Constants::THRESHOLD) + "/";
 public:
     long time_cost_1 = 0;

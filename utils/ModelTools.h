@@ -46,7 +46,7 @@ struct Net : torch::nn::Module
 {
 public:
     
-    string PATH = "./pre-train/trained_models/nn/4/";
+    string PATH = "../pre-train/trained_models/nn/4/";
     // string PATH = "../../pre-train/trained_models/nn/4/";
 
     float *w1;

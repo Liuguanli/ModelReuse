@@ -1,0 +1,4 @@
+pre-train/data/*
+pre-train/trained_models/*
+*.o
+Main

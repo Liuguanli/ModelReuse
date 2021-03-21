@@ -26,7 +26,7 @@ private:
 public:
     uint64_t page_size;
     uint64_t real_page_size;
-    string PATH = "./pre-train/trained_models/linear/0.1/";
+    string PATH = "../pre-train/trained_models/linear/0.1/";
     // string PATH = "../../pre-train/trained_models/linear/" + to_string(Constants::THRESHOLD) + "/";
     
     string tag;

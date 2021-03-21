@@ -37,7 +37,7 @@ public:
     uint64_t page_size;
     uint64_t real_page_size;
     // string PATH = "./pre-train/trained_models/nn/4/";
-    string PATH = "../../pre-train/trained_models/nn/4/";
+    string PATH = "../pre-train/trained_models/nn/4/";
     
     string tag;
 
