@@ -3,4 +3,5 @@ pre-train/trained_models/*
 *.o
 Main
 # entities/*.o
+utils/*.o
 
